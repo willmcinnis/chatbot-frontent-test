@@ -361,18 +361,25 @@ const ChatInterface = () => {
             </div>
           </div>
 
-<div className="container mx-auto max-w-3xl">
-              <form onSubmit={handleSubmit} className="flex gap-2">
+          <div className="border-t p-4">
+            <div className="container mx-auto max-w-3xl">
+              <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
                   placeholder="Type your message..."
                   className="flex-grow p-3 border rounded-lg text-black"
                   disabled={isLoading}
                 />
                 <button
-                  type="submit"
+                  onClick={handleSubmit}
                   className={`px-4 py-2 bg-blue-500 text-white rounded-lg ${
                     isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
                   }`}
@@ -380,7 +387,7 @@ const ChatInterface = () => {
                 >
                   Send
                 </button>
-              </form>
+              </div>
             </div>
           </div>
         </div>
