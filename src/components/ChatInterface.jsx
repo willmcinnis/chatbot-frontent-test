@@ -74,13 +74,29 @@ const ChatInterface = () => {
     }
   };
 
-  // Function to render message content with clickable images and formatted tables
+  // Function to format markdown-style text (bold, italics, etc.)
+  const formatMarkdown = (text) => {
+    if (!text) return '';
+    
+    // Handle bold text (**text**)
+    const boldRegex = /\*\*(.*?)\*\*/g;
+    const textWithBold = text.replace(boldRegex, '<strong>$1</strong>');
+    
+    // Handle italics (*text*)
+    const italicRegex = /\*(.*?)\*/g;
+    const textWithBoldAndItalic = textWithBold.replace(italicRegex, '<em>$1</em>');
+    
+    // Return the formatted text
+    return textWithBoldAndItalic;
+  };
+
+  // Function to render message content with clickable images, formatted tables, and markdown
   const renderMessageContent = (message) => {
     // Handle train part images from our backend
     if (message.trainPart && message.trainPart.imageUrl) {
       return (
         <div>
-          <div>{message.content}</div>
+          <div dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }} />
           <div className="mt-4 border rounded-lg overflow-hidden bg-white">
             <div className="p-2 bg-gray-100 border-b">
               <h3 className="font-medium text-gray-800">
@@ -119,17 +135,26 @@ const ChatInterface = () => {
       return <TableFormatter content={content} />;
     }
     
-    // Otherwise, use the existing image rendering
+    // Process the markdown formatting
+    const formattedContent = formatMarkdown(content);
+    
+    // Then check for images after processing markdown
     const imgRegex = /<img[^>]+src="([^">]+)"/g;
     let match;
     let lastIndex = 0;
     const parts = [];
-
+    
     // Find all image tags in the content
-    while ((match = imgRegex.exec(content)) !== null) {
+    let tempContent = formattedContent;
+    while ((match = imgRegex.exec(tempContent)) !== null) {
       // Add the text before the image
       if (match.index > lastIndex) {
-        parts.push(content.substring(lastIndex, match.index));
+        parts.push(
+          <span 
+            key={`text-${lastIndex}`} 
+            dangerouslySetInnerHTML={{ __html: tempContent.substring(lastIndex, match.index) }} 
+          />
+        );
       }
 
       // Extract the src from the image tag
@@ -138,7 +163,7 @@ const ChatInterface = () => {
       // Add a clickable image
       parts.push(
         <img 
-          key={match.index}
+          key={`img-${match.index}`}
           src={imgSrc} 
           alt="Chat content"
           className="max-w-full my-2 cursor-pointer hover:opacity-90 transition-opacity"
@@ -151,12 +176,22 @@ const ChatInterface = () => {
     }
 
     // Add any remaining text
-    if (lastIndex < content.length) {
-      parts.push(content.substring(lastIndex));
+    if (lastIndex < tempContent.length) {
+      parts.push(
+        <span 
+          key={`text-end`} 
+          dangerouslySetInnerHTML={{ __html: tempContent.substring(lastIndex) }} 
+        />
+      );
     }
 
-    // If no images were found, just return the original content
-    return parts.length > 0 ? parts : content;
+    // If we found images, return the parts array
+    if (parts.length > 0) {
+      return parts;
+    }
+    
+    // Otherwise, just return the formatted content
+    return <div dangerouslySetInnerHTML={{ __html: formattedContent }} />;
   };
 
   // Change from "bg-gray-50" to "bg-gray-100" to match darker gray 
