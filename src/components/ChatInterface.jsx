@@ -77,12 +77,15 @@ const ChatInterface = () => {
 
   // Schematic management functions
   const handleSaveSchematic = (name, folderId, schematicData) => {
+    // Only save if folderId is provided (no ungrouped schematics)
+    if (!folderId) return;
+    
     const schematicId = `schematic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const newSchematic = {
       id: schematicId,
       name,
       type: 'schematic',
-      folderId: folderId || null,
+      folderId: folderId,
       data: schematicData,
       savedAt: new Date().toISOString()
     };
@@ -122,21 +125,24 @@ const ChatInterface = () => {
       ...prev,
       [folderId]: newFolder
     }));
+    
+    // Return the folderId so it can be selected in the dialog
+    return folderId;
   };
 
   const handleDeleteFolder = (folderId) => {
     setSavedSchematics(prev => {
       const newSchematics = { ...prev };
       
-      // Delete the folder
-      delete newSchematics[folderId];
-      
-      // Move all schematics in this folder to ungrouped
+      // Delete all schematics in this folder (no ungrouped option)
       Object.keys(newSchematics).forEach(key => {
         if (newSchematics[key].type === 'schematic' && newSchematics[key].folderId === folderId) {
-          newSchematics[key].folderId = null;
+          delete newSchematics[key];
         }
       });
+      
+      // Delete the folder
+      delete newSchematics[folderId];
       
       return newSchematics;
     });
@@ -180,7 +186,7 @@ const ChatInterface = () => {
                   displayName: message.trainPart.displayName || message.trainPart.name,
                   originalData: message.trainPart
                 })}
-                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
                 title="Save schematic"
               >
                 <Save size={12} />
@@ -202,7 +208,7 @@ const ChatInterface = () => {
                   e.target.src = "/fallback-image.jpg";
                 }}
               />
-              <div className="absolute bottom-2 right-2 bg-blue-500 text-white p-1 rounded-lg text-xs">
+              <div className="absolute bottom-2 right-2 bg-blue-600 text-white p-1 rounded-lg text-xs font-medium">
                 Click to enlarge
               </div>
             </div>
@@ -254,7 +260,7 @@ const ChatInterface = () => {
               displayName: "Schematic Image",
               originalData: { imageUrl: imgSrc }
             })}
-            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
             title="Save schematic"
           >
             <Save size={12} />
@@ -380,8 +386,8 @@ const ChatInterface = () => {
                 />
                 <button
                   onClick={handleSubmit}
-                  className={`px-4 py-2 bg-blue-500 text-white rounded-lg ${
-                    isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'
+                  className={`px-4 py-2 bg-blue-600 text-white rounded-lg font-medium ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-700'
                   }`}
                   disabled={isLoading}
                 >
@@ -412,7 +418,7 @@ const ChatInterface = () => {
         >
           <div className="max-w-4xl max-h-screen relative bg-white rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-3 border-b flex justify-between items-center">
-              <h3 className="font-medium">{imagePopup.title}</h3>
+              <h3 className="font-medium text-gray-800">{imagePopup.title}</h3>
               <div className="flex gap-2">
                 <button
                   onClick={() => openSchematicSaveDialog({
@@ -420,7 +426,7 @@ const ChatInterface = () => {
                     displayName: imagePopup.title,
                     originalData: { imageUrl: imagePopup.url }
                   })}
-                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
                 >
                   <Save size={12} />
                   Save
