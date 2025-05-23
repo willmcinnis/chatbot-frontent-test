@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import { Save } from 'lucide-react';
 import TableFormatter from './TableFormatter';
+import SchematicSidebar from './SchematicSidebar';
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([]);
@@ -7,9 +9,13 @@ const ChatInterface = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [threadId, setThreadId] = useState(null);
   const [imagePopup, setImagePopup] = useState(null);
+  
+  // Sidebar and schematics state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [savedSchematics, setSavedSchematics] = useState({});
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!input.trim() || isLoading) return;
 
     const userMessage = {
@@ -43,19 +49,14 @@ const ChatInterface = () => {
 
       // Check if the response is a train part image
       if (data.isTrainPart && data.trainPart) {
-        const imageUrl = data.trainPart.imageUrl;
-        
-        // Create message with train part information
-        // Remove description from the displayed message
         const assistantMessage = {
           role: 'assistant',
-          content: `Here's the ${data.trainPart.displayName}`, // Remove description
+          content: `Here's the ${data.trainPart.displayName}`,
           trainPart: data.trainPart
         };
         
         setMessages(prev => [...prev, assistantMessage]);
       } else {
-        // Regular message without train part
         const assistantMessage = {
           role: 'assistant',
           content: data.message,
@@ -74,19 +75,90 @@ const ChatInterface = () => {
     }
   };
 
+  // Schematic management functions
+  const handleSaveSchematic = (name, folderId, schematicData) => {
+    const schematicId = `schematic_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newSchematic = {
+      id: schematicId,
+      name,
+      type: 'schematic',
+      folderId: folderId || null,
+      data: schematicData,
+      savedAt: new Date().toISOString()
+    };
+
+    setSavedSchematics(prev => ({
+      ...prev,
+      [schematicId]: newSchematic
+    }));
+  };
+
+  const handleLoadSchematic = (schematic) => {
+    // Display the schematic in an image popup
+    setImagePopup({
+      url: schematic.data.imageUrl,
+      title: schematic.name
+    });
+  };
+
+  const handleDeleteSchematic = (schematicId) => {
+    setSavedSchematics(prev => {
+      const newSchematics = { ...prev };
+      delete newSchematics[schematicId];
+      return newSchematics;
+    });
+  };
+
+  const handleCreateFolder = (name) => {
+    const folderId = `folder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const newFolder = {
+      id: folderId,
+      name,
+      type: 'folder',
+      createdAt: new Date().toISOString()
+    };
+
+    setSavedSchematics(prev => ({
+      ...prev,
+      [folderId]: newFolder
+    }));
+  };
+
+  const handleDeleteFolder = (folderId) => {
+    setSavedSchematics(prev => {
+      const newSchematics = { ...prev };
+      
+      // Delete the folder
+      delete newSchematics[folderId];
+      
+      // Move all schematics in this folder to ungrouped
+      Object.keys(newSchematics).forEach(key => {
+        if (newSchematics[key].type === 'schematic' && newSchematics[key].folderId === folderId) {
+          newSchematics[key].folderId = null;
+        }
+      });
+      
+      return newSchematics;
+    });
+  };
+
+  const openSchematicSaveDialog = (schematicData) => {
+    // This function will be called by the save button
+    if (window.openSchematicSaveDialog) {
+      window.openSchematicSaveDialog(schematicData);
+    }
+  };
+
   // Function to format markdown-style text (bold, italics, etc.)
   const formatMarkdown = (text) => {
     if (!text) return '';
     
-    // Handle bold text (**text**)
     const boldRegex = /\*\*(.*?)\*\*/g;
     const textWithBold = text.replace(boldRegex, '<strong>$1</strong>');
     
-    // Handle italics (*text*)
     const italicRegex = /\*(.*?)\*/g;
     const textWithBoldAndItalic = textWithBold.replace(italicRegex, '<em>$1</em>');
     
-    // Return the formatted text
     return textWithBoldAndItalic;
   };
 
@@ -98,10 +170,22 @@ const ChatInterface = () => {
         <div>
           <div dangerouslySetInnerHTML={{ __html: formatMarkdown(message.content) }} />
           <div className="mt-4 border rounded-lg overflow-hidden bg-white">
-            <div className="p-2 bg-gray-100 border-b">
+            <div className="p-2 bg-gray-100 border-b flex justify-between items-center">
               <h3 className="font-medium text-gray-800">
                 {message.trainPart.displayName || message.trainPart.name}
               </h3>
+              <button
+                onClick={() => openSchematicSaveDialog({
+                  imageUrl: message.trainPart.imageUrl,
+                  displayName: message.trainPart.displayName || message.trainPart.name,
+                  originalData: message.trainPart
+                })}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                title="Save schematic"
+              >
+                <Save size={12} />
+                Save
+              </button>
             </div>
             <div className="relative">
               <img 
@@ -115,7 +199,7 @@ const ChatInterface = () => {
                 })}
                 onError={(e) => {
                   console.error('Image failed to load:', e);
-                  e.target.src = "/fallback-image.jpg"; // Provide a fallback image path
+                  e.target.src = "/fallback-image.jpg";
                 }}
               />
               <div className="absolute bottom-2 right-2 bg-blue-500 text-white p-1 rounded-lg text-xs">
@@ -130,24 +214,19 @@ const ChatInterface = () => {
     // Handle normal content with potential tables
     const content = message.content;
     
-    // Check if the content might contain markdown tables
     if (content.includes('|') && content.includes('\n')) {
       return <TableFormatter content={content} />;
     }
     
-    // Process the markdown formatting
     const formattedContent = formatMarkdown(content);
     
-    // Then check for images after processing markdown
     const imgRegex = /<img[^>]+src="([^">]+)"/g;
     let match;
     let lastIndex = 0;
     const parts = [];
     
-    // Find all image tags in the content
     let tempContent = formattedContent;
     while ((match = imgRegex.exec(tempContent)) !== null) {
-      // Add the text before the image
       if (match.index > lastIndex) {
         parts.push(
           <span 
@@ -157,25 +236,36 @@ const ChatInterface = () => {
         );
       }
 
-      // Extract the src from the image tag
       const imgSrc = match[1];
 
-      // Add a clickable image
       parts.push(
-        <img 
-          key={`img-${match.index}`}
-          src={imgSrc} 
-          alt="Chat content"
-          className="max-w-full my-2 cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={() => setImagePopup({ url: imgSrc, title: "Image" })}
-          style={{ maxHeight: '300px' }}
-        />
+        <div key={`img-container-${match.index}`} className="relative inline-block">
+          <img 
+            key={`img-${match.index}`}
+            src={imgSrc} 
+            alt="Chat content"
+            className="max-w-full my-2 cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => setImagePopup({ url: imgSrc, title: "Image" })}
+            style={{ maxHeight: '300px' }}
+          />
+          <button
+            onClick={() => openSchematicSaveDialog({
+              imageUrl: imgSrc,
+              displayName: "Schematic Image",
+              originalData: { imageUrl: imgSrc }
+            })}
+            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+            title="Save schematic"
+          >
+            <Save size={12} />
+            Save
+          </button>
+        </div>
       );
 
       lastIndex = match.index + match[0].length;
     }
 
-    // Add any remaining text
     if (lastIndex < tempContent.length) {
       parts.push(
         <span 
@@ -185,20 +275,29 @@ const ChatInterface = () => {
       );
     }
 
-    // If we found images, return the parts array
     if (parts.length > 0) {
       return parts;
     }
     
-    // Otherwise, just return the formatted content
     return <div dangerouslySetInnerHTML={{ __html: formattedContent }} />;
   };
 
-  // Change from "bg-gray-50" to "bg-gray-100" to match darker gray 
   const chatBackgroundClass = "bg-gray-100";
 
   return (
     <div className="flex flex-col w-full h-screen">
+      {/* Schematic Sidebar */}
+      <SchematicSidebar
+        isOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen(!sidebarOpen)}
+        savedSchematics={savedSchematics}
+        onSaveSchematic={handleSaveSchematic}
+        onLoadSchematic={handleLoadSchematic}
+        onDeleteSchematic={handleDeleteSchematic}
+        onCreateFolder={handleCreateFolder}
+        onDeleteFolder={handleDeleteFolder}
+      />
+
       {/* Main Content Area with Sidebars */}
       <div className="flex flex-1 w-full overflow-hidden">
         {/* Left Sidebar */}
@@ -214,7 +313,7 @@ const ChatInterface = () => {
 
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Logo area with darker gray background */}
+          {/* Logo area */}
           <div className={`py-2 flex justify-center ${chatBackgroundClass}`}>
             <div className={`h-24 relative ${chatBackgroundClass}`}>
               <img 
@@ -262,8 +361,7 @@ const ChatInterface = () => {
             </div>
           </div>
 
-          <div className="border-t p-4">
-            <div className="container mx-auto max-w-3xl">
+<div className="container mx-auto max-w-3xl">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <input
                   type="text"
@@ -308,12 +406,25 @@ const ChatInterface = () => {
           <div className="max-w-4xl max-h-screen relative bg-white rounded-lg overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-3 border-b flex justify-between items-center">
               <h3 className="font-medium">{imagePopup.title}</h3>
-              <button 
-                className="bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center text-black font-bold hover:bg-gray-300"
-                onClick={() => setImagePopup(null)}
-              >
-                ×
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openSchematicSaveDialog({
+                    imageUrl: imagePopup.url,
+                    displayName: imagePopup.title,
+                    originalData: { imageUrl: imagePopup.url }
+                  })}
+                  className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                  <Save size={12} />
+                  Save
+                </button>
+                <button 
+                  className="bg-gray-200 rounded-full w-8 h-8 flex items-center justify-center text-black font-bold hover:bg-gray-300"
+                  onClick={() => setImagePopup(null)}
+                >
+                  ×
+                </button>
+              </div>
             </div>
             <div className="p-4">
               <img 
