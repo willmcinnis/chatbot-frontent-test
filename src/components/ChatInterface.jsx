@@ -22,7 +22,7 @@ const ChatInterface = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('https://chatbot-backend-kucx.onrender.com/api/chat', {
+      const response = await fetch('https://chatbot-backend-test-msq9.onrender.com/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
