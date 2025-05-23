@@ -52,6 +52,14 @@ const SchematicSidebar = ({
     setShowSaveDialog(true);
   };
 
+  // Set up the global function for opening save dialog
+  React.useEffect(() => {
+    window.openSchematicSaveDialog = openSaveDialog;
+    return () => {
+      delete window.openSchematicSaveDialog;
+    };
+  }, []);
+
   // Get folders and ungrouped schematics
   const folders = Object.keys(savedSchematics).filter(key => 
     savedSchematics[key].type === 'folder'
@@ -304,18 +312,6 @@ const SchematicSidebar = ({
       >
         <Folder size={20} />
       </button>
-
-      {/* Expose save function for external use */}
-      <div style={{ display: 'none' }}>
-        {/* This allows parent component to trigger save dialog */}
-        <button ref={(ref) => {
-          if (ref && window) {
-            window.openSchematicSaveDialog = openSaveDialog;
-          }
-        }}>
-          Hidden Save Button
-        </button>
-      </div>
     </>
   );
 };
